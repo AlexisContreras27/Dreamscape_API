@@ -1,0 +1,10 @@
+# dreamscape_api/.gitignore
+
+venv/         # Ignora tu entorno virtual de Python
+__pycache__/  # Ignora los archivos de caché de Python
+*.pyc         # Ignora los archivos compilados de Python
+.env          # ¡MUY IMPORTANTE! No incluyas tu archivo .env en Git
+.git/         # Ignora el propio directorio de Git (aunque Git lo gestiona, es buena práctica)
+.gitignore    # Ignora el propio archivo .gitignore
+.vscode/      # Ignora archivos de configuración de VS Code
+*.db          # Ignora cualquier archivo de base de datos SQLite (.db) generado localmente

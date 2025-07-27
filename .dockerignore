@@ -1,0 +1,10 @@
+# dreamscape_api/.dockerignore
+
+venv/         # Ignora tu entorno virtual de Python
+__pycache__/  # Ignora los archivos de caché de Python
+*.pyc         # Ignora los archivos compilados de Python
+.env          # ¡MUY IMPORTANTE! No incluyas tu archivo .env en la imagen Docker
+.git/         # Ignora el directorio de Git si estás usando control de versiones
+.gitignore    # Ignora el propio archivo .gitignore
+.vscode/      # Ignora archivos de configuración de VS Code
+*.db          # Ignora cualquier archivo de base de datos SQLite (.db) generado localmente
