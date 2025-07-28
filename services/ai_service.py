@@ -1,76 +1,75 @@
-# services/ai_service.py
+# dreamscape_api/services/ai_service.py
 
 import os
 import google.generativeai as genai
-import asyncio # Necesitas esto si tu función de IA va a ser async
+import asyncio # Necesitamos esto para ejecutar la llamada síncrona a Gemini en un hilo separado
 
-# Configura Gemini con tu clave API
-# Esta configuración se hace una vez al inicio del programa.
-# Es importante que GEMINI_API_KEY esté disponible en el entorno.
-# Esto puede hacerse mejor en un archivo de configuración o al inicio de la app.
-
-# Una mejor práctica sería inicializar el modelo una vez y pasarlo
-# o usar un singleton, pero para empezar, esta es una forma simple.
-
+# --- Configuración de Gemini (asegúrate de que GEMINI_API_KEY esté en el entorno) ---
 def get_gemini_model():
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY no está configurada en las variables de entorno.")
     genai.configure(api_key=api_key)
-    # Elige el modelo apropiado. 'gemini-pro' es un buen punto de partida para texto.
+    # Puedes elegir 'gemini-pro' para texto
     return genai.GenerativeModel('gemini-pro')
 
-async def generate_dream_content_with_gemini(dream_description: str, preferred_output_type: str):
+# --- Función que main.py espera para "analizar" (puede ser simple o una simulación) ---
+async def analyze_dream_description(dream_description: str):
     """
-    Genera contenido con Google Gemini basado en la descripción del sueño
-    y el tipo de salida preferido.
+    Función que simula un análisis de la descripción del sueño.
+    Por ahora, no usa IA para el análisis profundo, solo devuelve un mensaje.
+    Podrías expandir esto con Gemini si necesitas un análisis más complejo.
+    """
+    print(f"DEBUG (AI Service): Analizando descripción del sueño: '{dream_description}'")
+    # Este es el resultado que main.py espera para 'analysis_result'
+    return {"summary": f"Análisis básico: El sueño trata sobre {dream_description[:50]}..."}
+
+# --- Función que main.py espera para "generar contenido" con Gemini ---
+async def generate_content_from_dream(dream_description: str, preferred_output_type: str):
+    """
+    Genera contenido creativo (historia, poema, etc.) utilizando Google Gemini.
     """
     try:
-        model = get_gemini_model() # Obtiene o inicializa el modelo Gemini
-
-        # Construye el prompt para Gemini
-        # Sé lo más específico posible con el prompt para mejores resultados
+        model = get_gemini_model() # Obtiene el modelo de Gemini
+        
+        # Construye el prompt para Gemini. ¡Sé lo más específico posible!
         prompt = f"""
-        Basado en la siguiente descripción de un sueño, genera un contenido creativo
-        con el formato o tipo de salida solicitado.
+        Basado en la siguiente descripción de un sueño, genera un contenido creativo.
+        El formato o tipo de salida preferido es: {preferred_output_type}.
 
         Descripción del Sueño:
-        {dream_description}
+        "{dream_description}"
 
-        Tipo de Salida Preferido: {preferred_output_type}
+        Por favor, genera el contenido y asegúrate de que sea coherente con la descripción y el tipo solicitado.
         """
 
+        print(f"DEBUG (AI Service): Enviando prompt a Gemini para generar {preferred_output_type} para '{dream_description[:50]}...'")
+
         # Realiza la llamada asíncrona a la API de Gemini
-        # Usamos await porque generate_content puede ser una operación que toma tiempo
-        response = await asyncio.to_thread(model.generate_content, prompt) # Para hacer síncrona la llamada dentro de una función async
-        # O si el método de Gemini es directamente async:
-        # response = await model.generate_content_async(prompt)
-
-        # Extrae el texto generado de la respuesta
+        # asyncio.to_thread permite llamar a funciones síncronas (como model.generate_content)
+        # desde una función asíncrona sin bloquear el bucle de eventos.
+        response = await asyncio.to_thread(model.generate_content, prompt)
+        
+        # Extrae el texto generado de la respuesta de Gemini
         generated_text = response.text
+        print(f"DEBUG (AI Service): Contenido generado por Gemini (primeras 100 chars): {generated_text[:100]}...")
 
         return {
-            "generated_content_preview": generated_text,
-            "generated_content_url": None # Gemini no genera URLs de contenido directamente, tendrías que subirlo a un bucket S3/GCS. Por ahora, dejarlo en None.
+            "preview": generated_text, # Esto mapea a 'generated_content_preview' en main.py
+            "url": None # Por ahora, Gemini solo devuelve texto, no una URL de contenido.
         }
+
     except ValueError as e:
-        # Si la clave API no está configurada
+        # Error si la clave API no está configurada
+        print(f"ERROR (AI Service): Configuración de API de Gemini faltante: {e}")
         return {
-            "generated_content_preview": f"Error de configuración: {e}. No se pudo generar el contenido.",
-            "generated_content_url": None
+            "preview": f"Error de configuración de IA: {e}. Contenido no generado.",
+            "url": None
         }
     except Exception as e:
-        # Captura otros errores (ej., problemas con la API de Gemini)
+        # Cualquier otro error durante la llamada a Gemini
+        print(f"ERROR (AI Service): Fallo en la llamada a la API de Gemini: {e}")
         return {
-            "generated_content_preview": f"Error al generar contenido con IA: {e}",
-            "generated_content_url": None
+            "preview": f"Error al generar contenido con IA: {e}. Por favor, revise los logs del servidor.",
+            "url": None
         }
-
-# Asegúrate de que tu main.py o tus routers llamen a esta función
-# en lugar de la versión placeholder.
-# Por ejemplo, en tu endpoint POST /dreams/
-# from dreamscape_api.services.ai_service import generate_dream_content_with_gemini
-# ...
-# dream.generated_content_preview = (await generate_dream_content_with_gemini(
-#    dream.dream_description, dream.preferred_output_type
-# ))["generated_content_preview"]
