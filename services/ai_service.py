@@ -1,66 +1,76 @@
-# dreamscape_api/services/ai_service.py
+# services/ai_service.py
+
 import os
-import time
-from typing import Dict
+import google.generativeai as genai
+import asyncio # Necesitas esto si tu función de IA va a ser async
 
-# Aquí es donde realmente importarías los SDKs de las APIs de Google/OpenAI
-# Por ejemplo:
-# from google.cloud import language_v1 # Para Natural Language API
-# import google.generativeai as genai # Para Google Gemini API
+# Configura Gemini con tu clave API
+# Esta configuración se hace una vez al inicio del programa.
+# Es importante que GEMINI_API_KEY esté disponible en el entorno.
+# Esto puede hacerse mejor en un archivo de configuración o al inicio de la app.
 
-# Si usaras Gemini, configurarías tu clave de API aquí (cargada desde .env):
-# genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# Una mejor práctica sería inicializar el modelo una vez y pasarlo
+# o usar un singleton, pero para empezar, esta es una forma simple.
 
-def analyze_dream_description(description: str) -> Dict:
+def get_gemini_model():
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY no está configurada en las variables de entorno.")
+    genai.configure(api_key=api_key)
+    # Elige el modelo apropiado. 'gemini-pro' es un buen punto de partida para texto.
+    return genai.GenerativeModel('gemini-pro')
+
+async def generate_dream_content_with_gemini(dream_description: str, preferred_output_type: str):
     """
-    Simula el análisis de la descripción del sueño usando una API de PLN (como Google Cloud Natural Language API).
-    En una implementación real, harías la llamada HTTP o usarías el SDK de la API de PLN.
+    Genera contenido con Google Gemini basado en la descripción del sueño
+    y el tipo de salida preferido.
     """
-    print(f"DEBUG: Analizando sueño: '{description}'...") # Mensaje de depuración
-    time.sleep(1) # Simula una pequeña latencia (retardo) como si hicieras una llamada de red real.
+    try:
+        model = get_gemini_model() # Obtiene o inicializa el modelo Gemini
 
-    # --- AQUÍ IRÍA LA LÓGICA REAL DE INTEGRACIÓN CON LA API DE PLN ---
-    # Ejemplo con Google Cloud Natural Language API:
-    # client = language_v1.LanguageServiceClient()
-    # document = language_v1.Document(content=description, type_=language_v1.Document.Type.PLAIN_TEXT)
-    # sentiment = client.analyze_sentiment(request={'document': document}).document_sentiment
-    # entities = client.analyze_entities(request={'document': document}).entities
-    # return {"sentiment_score": sentiment.score, "keywords": [e.name for e in entities[:3]]}
-    # -----------------------------------------------------------------
+        # Construye el prompt para Gemini
+        # Sé lo más específico posible con el prompt para mejores resultados
+        prompt = f"""
+        Basado en la siguiente descripción de un sueño, genera un contenido creativo
+        con el formato o tipo de salida solicitado.
 
-    # Para esta guía, solo retornamos datos simulados:
-    sentiment_score = 0.8 # Un valor de ejemplo
-    keywords = ["bosque encantado", "dragones", "volar"] # Palabras clave de ejemplo
-    return {"sentiment_score": sentiment_score, "keywords": keywords}
+        Descripción del Sueño:
+        {dream_description}
 
-def generate_content_from_dream(description: str, output_type: str) -> Dict:
-    """
-    Simula la generación de contenido creativo (narrativa, ilustración, 3D)
-    usando una API de IA generativa (como Google Gemini API, DALL-E, etc.).
-    """
-    print(f"DEBUG: Generando {output_type} para: '{description}'...") # Mensaje de depuración
-    time.sleep(3) # Simula un procesamiento más largo, ya que la generación de IA puede tardar.
+        Tipo de Salida Preferido: {preferred_output_type}
+        """
 
-    generated_text = ""
-    generated_url = ""
+        # Realiza la llamada asíncrona a la API de Gemini
+        # Usamos await porque generate_content puede ser una operación que toma tiempo
+        response = await asyncio.to_thread(model.generate_content, prompt) # Para hacer síncrona la llamada dentro de una función async
+        # O si el método de Gemini es directamente async:
+        # response = await model.generate_content_async(prompt)
 
-    # --- AQUÍ IRÍA LA LÓGICA REAL DE INTEGRACIÓN CON LA API DE IA GENERATIVA ---
-    if output_type == "narrative":
-        # Ejemplo con Google Gemini API para texto:
-        # model = genai.GenerativeModel('gemini-pro')
-        # response = model.generate_content(f"Crea una narrativa de fantasía basada en el siguiente sueño: {description}")
-        # generated_text = response.text
-        generated_text = f"En las alas de un sueño, te elevabas sobre un bosque donde la luz danzaba entre los árboles y criaturas mágicas te saludaban. Los dragones, lejos de ser temibles, te ofrecían un vuelo seguro por el cielo estrellado, revelando secretos de un mundo olvidado..."
-        generated_url = "https://dreamscapeapi.com/content/narrative/example.txt"
-    elif output_type == "illustration":
-        # Ejemplo con Gemini (si ofrece generación de imágenes) o DALL-E/Midjourney:
-        # (Llamarías a la API de generación de imágenes con una descripción)
-        generated_text = "Ilustración generada: 'Bosque encantado con dragones volando, estilo acuarela digital'."
-        generated_url = "https://dreamscapeapi.com/content/illustration/example.png"
-    elif output_type == "3d_scenario":
-        # Esto es más complejo, quizás una descripción para un motor 3D o una escena pre-renderizada:
-        generated_text = "Escenario 3D generado: 'Un claro en el bosque encantado con un dragón posado junto a un río, modelo GLB.'"
-        generated_url = "https://dreamscapeapi.com/content/3d/example.glb" # Ejemplo de un modelo 3D
-    # -------------------------------------------------------------------------
+        # Extrae el texto generado de la respuesta
+        generated_text = response.text
 
-    return {"preview": generated_text[:100] + "...", "url": generated_url} # Retorna un preview corto y la URL.
+        return {
+            "generated_content_preview": generated_text,
+            "generated_content_url": None # Gemini no genera URLs de contenido directamente, tendrías que subirlo a un bucket S3/GCS. Por ahora, dejarlo en None.
+        }
+    except ValueError as e:
+        # Si la clave API no está configurada
+        return {
+            "generated_content_preview": f"Error de configuración: {e}. No se pudo generar el contenido.",
+            "generated_content_url": None
+        }
+    except Exception as e:
+        # Captura otros errores (ej., problemas con la API de Gemini)
+        return {
+            "generated_content_preview": f"Error al generar contenido con IA: {e}",
+            "generated_content_url": None
+        }
+
+# Asegúrate de que tu main.py o tus routers llamen a esta función
+# en lugar de la versión placeholder.
+# Por ejemplo, en tu endpoint POST /dreams/
+# from dreamscape_api.services.ai_service import generate_dream_content_with_gemini
+# ...
+# dream.generated_content_preview = (await generate_dream_content_with_gemini(
+#    dream.dream_description, dream.preferred_output_type
+# ))["generated_content_preview"]
