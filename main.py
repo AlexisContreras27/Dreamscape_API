@@ -48,11 +48,11 @@ async def process_dream_in_background(dream_id: int, db_session: Session):
 
         try:
             # 1. Análisis de la descripción del sueño usando nuestro servicio de IA simulado
-            analysis_result = ai_service.analyze_dream_description(dream.dream_description)
+            analysis_result = await ai_service.analyze_dream_description(dream.dream_description)
             print(f"DEBUG: Análisis completado para sueño ID {dream_id}: {analysis_result}")
 
             # 2. Generación de contenido usando nuestro servicio de IA simulado
-            generation_result = ai_service.generate_content_from_dream(
+            generation_result = await ai_service.generate_content_from_dream(
                 dream.dream_description, dream.preferred_output_type
             )
             print(f"DEBUG: Generación completada para sueño ID {dream_id}: {generation_result}")
