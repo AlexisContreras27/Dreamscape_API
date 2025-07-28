@@ -11,7 +11,7 @@ def get_gemini_model():
         raise ValueError("GEMINI_API_KEY no está configurada en las variables de entorno.")
     genai.configure(api_key=api_key)
     # Puedes elegir 'gemini-pro' para texto
-    return genai.GenerativeModel('gemini-pro')
+    return genai.GenerativeModel('gemini-1.5-flash')
 
 # --- Función que main.py espera para "analizar" (puede ser simple o una simulación) ---
 async def analyze_dream_description(dream_description: str):
